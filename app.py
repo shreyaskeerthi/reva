@@ -1,9 +1,10 @@
 """
-CRE Deal Voice Agent - Main Streamlit Application
+REVA - Real Estate Voice Agent - Main Streamlit Application
 """
 import streamlit as st
 import logging
 import json
+import time
 from datetime import datetime
 from pathlib import Path
 import sys
@@ -32,8 +33,8 @@ from cre_agent.examples import get_all_examples
 
 # Page config
 st.set_page_config(
-    page_title="CRE Deal Voice Agent",
-    page_icon="🏢",
+    page_title="REVA",
+    page_icon="⚡",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -41,6 +42,15 @@ st.set_page_config(
 # Custom CSS for better styling
 st.markdown("""
 <style>
+    /* REVA Purple Theme */
+    .reva-title {
+        color: #9333ea !important;
+        font-weight: bold;
+        font-size: 2.5rem;
+    }
+    .reva-subtitle {
+        color: #a855f7 !important;
+    }
     .verdict-pass { background-color: #d4edda; color: #155724; padding: 10px; border-radius: 5px; font-weight: bold; }
     .verdict-watch { background-color: #fff3cd; color: #856404; padding: 10px; border-radius: 5px; font-weight: bold; }
     .verdict-hard-pass { background-color: #f8d7da; color: #721c24; padding: 10px; border-radius: 5px; font-weight: bold; }
@@ -48,7 +58,8 @@ st.markdown("""
     .status-healthy { color: #28a745; font-weight: bold; }
     .status-unhealthy { color: #dc3545; font-weight: bold; }
     .navigation-hint {
-        background-color: #e7f3ff;
+        background-color: #1a1a1a;
+        color: #ffffff;
         border-left: 4px solid #2196F3;
         padding: 12px;
         margin: 15px 0;
@@ -79,9 +90,12 @@ if 'deal_text' not in st.session_state:
 if 'active_tab' not in st.session_state:
     st.session_state.active_tab = 0
 
+if 'switch_to_tab' not in st.session_state:
+    st.session_state.switch_to_tab = None
+
 # Main title
-st.title("🏢 CRE Deal Voice Agent")
-st.markdown("*Powered by AWS Bedrock, Deepgram, Merge, and more*")
+st.markdown('<h1 class="reva-title">⚡ REVA</h1>', unsafe_allow_html=True)
+st.markdown('<p class="reva-subtitle"><em>Powered by AWS Bedrock, Deepgram, Merge</em></p>', unsafe_allow_html=True)
 
 # Sidebar: Buy-box Settings
 st.sidebar.header("⚙️ Buy-Box Settings")
@@ -146,26 +160,52 @@ selected_types = st.sidebar.multiselect(
 )
 buybox["preferred_property_types"] = selected_types
 
-st.sidebar.divider()
-st.sidebar.markdown(f"**Demo Mode:** {'✅ ON' if st.session_state.settings.demo_mode else '❌ OFF'}")
-st.sidebar.markdown(f"**AWS Bedrock:** {'✅' if st.session_state.settings.has_aws_config else '❌'}")
-st.sidebar.markdown(f"**S3 Storage:** {'✅' if st.session_state.settings.has_s3_config else '❌'}")
-st.sidebar.markdown(f"**Deepgram:** {'✅' if st.session_state.settings.has_deepgram_config else '❌'}")
-st.sidebar.markdown(f"**Merge CRM:** {'✅' if st.session_state.settings.has_merge_config else '❌'}")
+# st.sidebar.divider()
+# st.sidebar.markdown(f"**Demo Mode:** {'✅ ON' if st.session_state.settings.demo_mode else '❌ OFF'}")
+# st.sidebar.markdown(f"**AWS Bedrock:** {'✅' if st.session_state.settings.has_aws_config else '❌'}")
+# st.sidebar.markdown(f"**S3 Storage:** {'✅' if st.session_state.settings.has_s3_config else '❌'}")
+# st.sidebar.markdown(f"**Deepgram:** {'✅' if st.session_state.settings.has_deepgram_config else '❌'}")
+# st.sidebar.markdown(f"**Merge CRM:** {'✅' if st.session_state.settings.has_merge_config else '❌'}")
 
 # Check for tab navigation via query params
 query_params = st.query_params
 if "tab" in query_params:
     try:
-        st.session_state.active_tab = int(query_params["tab"])
+        tab_index = int(query_params["tab"])
+        st.session_state.switch_to_tab = tab_index
+        # Clear the query param after reading it
+        st.query_params.clear()
     except:
         pass
 
 # Main content area - Use a selectbox for tab navigation to allow programmatic control
-tab_names = ["📝 Input", "🔍 Analyze", "📞 CRM", "📋 Evidence", "⚙️ Jobs", "🔒 Security & Infra", "📊 History"]
+tab_names = ["Input", "Analyze", "CRM", "Evidence", "Jobs", "Security & Infra", "History"]
 
 # Create tabs
 tab_input, tab_analyze, tab_crm, tab_evidence, tab_jobs, tab_security, tab_history = st.tabs(tab_names)
+
+# Handle programmatic tab switching via JavaScript
+if st.session_state.switch_to_tab is not None:
+    tab_index = st.session_state.switch_to_tab
+    st.session_state.switch_to_tab = None  # Reset after use
+    st.markdown(f"""
+    <script>
+        setTimeout(function() {{
+            // Try multiple selectors to find tab buttons
+            var tabButtons = document.querySelectorAll('[data-testid="stTabs"] button, button[role="tab"], [data-baseweb="tab"]');
+            if (tabButtons.length === 0) {{
+                // Fallback: find buttons within tab container
+                var tabContainer = document.querySelector('[data-testid="stTabs"]');
+                if (tabContainer) {{
+                    tabButtons = tabContainer.querySelectorAll('button');
+                }}
+            }}
+            if (tabButtons.length > {tab_index}) {{
+                tabButtons[{tab_index}].click();
+            }}
+        }}, 150);
+    </script>
+    """, unsafe_allow_html=True)
 
 # TAB: Input
 with tab_input:
@@ -223,6 +263,47 @@ with tab_input:
             placeholder="Paste your deal text here...",
             key="paste_editor"
         )
+        
+        # Show progress indicator when text is entered
+        if st.session_state.deal_text and st.session_state.deal_text.strip():
+            # Track previous text to detect new paste
+            if 'previous_paste_text' not in st.session_state:
+                st.session_state.previous_paste_text = ""
+            
+            # Check if this is a new paste
+            is_new_paste = st.session_state.deal_text != st.session_state.previous_paste_text
+            
+            if is_new_paste:
+                # Show progress with spinner
+                with st.spinner("📋 Processing pasted text..."):
+                    # Show progress bar
+                    progress_bar = st.progress(0)
+                    status_text = st.caption("Processing...")
+                    
+                    # Animate progress
+                    for i in range(0, 101, 20):
+                        progress_bar.progress(i / 100)
+                        if i < 100:
+                            status_text.caption(f"📋 Processing text... {i}%")
+                        time.sleep(0.1)
+                    
+                    # Complete
+                    progress_bar.progress(1.0)
+                    status_text.caption("Complete!")
+                    time.sleep(0.2)
+                
+                # Show success message
+                st.success("Text loaded successfully!")
+                
+                # Update previous text
+                st.session_state.previous_paste_text = st.session_state.deal_text
+            else:
+                # Text already processed, just show success
+                st.success("Text loaded successfully!")
+        else:
+            # Reset tracking when text is cleared
+            if 'previous_paste_text' in st.session_state:
+                st.session_state.previous_paste_text = ""
 
     else:  # Load Example
         st.subheader("Load Example Deal")
@@ -250,18 +331,18 @@ with tab_input:
     if st.session_state.deal_text:
         st.divider()
         st.markdown('<div class="navigation-hint">✅ Deal text loaded! Click below to move to the next step.</div>', unsafe_allow_html=True)
-        if st.button("➡️ Next: Analyze Deal", type="primary", use_container_width=True, key="nav_to_analyze"):
-            st.query_params["tab"] = "1"
-            st.rerun()
+        # if st.button("➡️ Next: Analyze Deal", type="primary", use_container_width=True, key="nav_to_analyze"):
+        #     st.session_state.switch_to_tab = 1  # Index 1 = Analyze tab
+        #     st.rerun()
 
 # TAB: Analyze
 with tab_analyze:
     st.header("Deal Analysis")
 
     if not st.session_state.deal_text:
-        st.info("👈 Please input deal text in the Input tab first")
+        st.info("Please input deal text in the Input tab first")
     else:
-        if st.button("🚀 Run CRE Deal Agent", type="primary", use_container_width=True):
+        if st.button("Run CRE Deal Agent", type="primary", use_container_width=True):
             with st.spinner("Analyzing deal..."):
                 try:
                     run_payload = run_deal_agent(
@@ -339,15 +420,15 @@ with tab_analyze:
             ic_summary = run.get("ic_summary", "")
             st.markdown(ic_summary)
 
-            if st.button("📋 Copy IC Summary"):
+            if st.button("📋 Send IC Summary to Slack"):
                 st.code(ic_summary, language=None)
                 st.info("Copy the text above to your clipboard")
 
             # Navigation button
             st.divider()
             st.markdown('<div class="navigation-hint">✅ Deal analyzed! Click below to create CRM records.</div>', unsafe_allow_html=True)
-            if st.button("➡️ Next: Create CRM Records", type="primary", use_container_width=True, key="nav_to_crm"):
-                st.query_params["tab"] = "2"
+            if st.button("Next: Create CRM Records", type="primary", use_container_width=True, key="nav_to_crm"):
+                st.session_state.switch_to_tab = 2  # Index 2 = CRM tab
                 st.rerun()
 
 # TAB: CRM
@@ -355,7 +436,7 @@ with tab_crm:
     st.header("CRM Actions (Merge)")
 
     if not st.session_state.last_run:
-        st.info("👈 Please analyze a deal first")
+        st.info("Please analyze a deal first")
     else:
         run = st.session_state.last_run
         structured = run.get("structured_deal", {})
@@ -438,8 +519,8 @@ with tab_crm:
             # Navigation button
             st.divider()
             st.markdown('<div class="navigation-hint">✅ CRM records created! Click below to generate evidence packets.</div>', unsafe_allow_html=True)
-            if st.button("➡️ Next: Generate Evidence", type="primary", use_container_width=True, key="nav_to_evidence"):
-                st.query_params["tab"] = "3"
+            if st.button("Next: Generate Evidence", type="primary", use_container_width=True, key="nav_to_evidence"):
+                st.session_state.switch_to_tab = 3  # Index 3 = Evidence tab
                 st.rerun()
 
 # TAB: Evidence
@@ -447,7 +528,7 @@ with tab_evidence:
     st.header("Evidence & Compliance")
 
     if not st.session_state.last_run:
-        st.info("👈 Please analyze a deal first")
+        st.info("Please analyze a deal first")
     else:
         st.markdown("Generate compliance evidence packets for Vanta and Thoropass")
 
@@ -483,8 +564,8 @@ with tab_evidence:
                     # Navigation button
                     st.divider()
                     st.markdown('<div class="navigation-hint">✅ Evidence packets sent! Click below to run daily summary job.</div>', unsafe_allow_html=True)
-                    if st.button("➡️ Next: Run Daily Summary Job", type="primary", use_container_width=True, key="nav_to_jobs"):
-                        st.query_params["tab"] = "4"
+                    if st.button("Next: Run Daily Summary Job", type="primary", use_container_width=True, key="nav_to_jobs"):
+                        st.session_state.switch_to_tab = 4  # Index 4 = Jobs tab
                         st.rerun()
 
                 except Exception as e:
@@ -500,7 +581,7 @@ with tab_jobs:
     In production, this would be scheduled via Dagster to run automatically.
     """)
 
-    if st.button("▶️ Run Daily Summary Job", use_container_width=True):
+    if st.button("Run Daily Summary Job", use_container_width=True):
         with st.spinner("Running daily summary job..."):
             try:
                 summary = run_daily_summary_job()
@@ -536,8 +617,8 @@ with tab_jobs:
                     # Navigation button
                     st.divider()
                     st.markdown('<div class="navigation-hint">✅ Daily summary complete! Click below to check security & infrastructure.</div>', unsafe_allow_html=True)
-                    if st.button("➡️ Next: Security & Infra", type="primary", use_container_width=True, key="nav_to_security"):
-                        st.query_params["tab"] = "5"
+                    if st.button("Next: Security & Infra", type="primary", use_container_width=True, key="nav_to_security"):
+                        st.session_state.switch_to_tab = 5  # Index 5 = Security & Infra tab
                         st.rerun()
 
                 else:
@@ -596,8 +677,8 @@ with tab_security:
                 # Navigation button
                 st.divider()
                 st.markdown('<div class="navigation-hint">🎉 Demo complete! View deal history or start over.</div>', unsafe_allow_html=True)
-                if st.button("➡️ View Deal History", type="primary", use_container_width=True, key="nav_to_history"):
-                    st.query_params["tab"] = "6"
+                if st.button("View Deal History", type="primary", use_container_width=True, key="nav_to_history"):
+                    st.session_state.switch_to_tab = 6  # Index 6 = History tab
                     st.rerun()
 
 # TAB: History
@@ -655,7 +736,7 @@ with tab_history:
 st.divider()
 st.markdown("""
 <div style="text-align: center; color: #666; font-size: 0.9em;">
-    CRE Deal Voice Agent v1.0 | Powered by AWS Bedrock, Deepgram, Merge, Island, Spectro Cloud, Vanta, Thoropass, Dagster & Coder
+    REVA v1.0 | Powered by AWS Bedrock, Deepgram, Merge
 </div>
 """, unsafe_allow_html=True)
 
