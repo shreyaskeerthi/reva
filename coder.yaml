@@ -1,0 +1,107 @@
+# Coder Development Environment Configuration
+# This file defines a reproducible dev environment for the CRE Deal Voice Agent
+
+version: "1.0"
+
+name: cre-deal-voice-agent
+display_name: "CRE Deal Voice Agent"
+description: "Commercial Real Estate deal analysis agent with voice input and sponsor integrations"
+
+# Base image
+image: python:3.11-slim
+
+# Environment variables template
+env:
+  - name: DEMO_MODE
+    description: "Enable demo mode for all integrations"
+    default: "1"
+  - name: AWS_REGION
+    description: "AWS region for Bedrock and S3"
+    default: "us-east-1"
+  - name: USE_BEDROCK
+    description: "Use AWS Bedrock for deal extraction"
+    default: "1"
+
+# Startup commands
+startup:
+  # Update package lists
+  - name: update-packages
+    command: apt-get update
+
+  # Install system dependencies
+  - name: install-system-deps
+    command: apt-get install -y git curl awscli
+
+  # Install Python dependencies
+  - name: install-python-deps
+    command: pip install --upgrade pip && pip install -r requirements.txt
+
+  # Create necessary directories
+  - name: create-dirs
+    command: mkdir -p ./runs ./static
+
+  # Copy environment file if it doesn't exist
+  - name: setup-env
+    command: |
+      if [ ! -f .env ]; then
+        cp .env.example .env
+        echo "Created .env file from template. Please configure your API keys."
+      fi
+
+# Development commands
+commands:
+  - name: start
+    description: "Start the Streamlit application"
+    command: streamlit run app.py
+
+  - name: test
+    description: "Run tests (if available)"
+    command: python -m pytest tests/ -v
+
+  - name: install
+    description: "Install dependencies"
+    command: pip install -r requirements.txt
+
+  - name: format
+    description: "Format code with black"
+    command: black cre_agent/ app.py
+
+# Port forwarding
+ports:
+  - port: 8501
+    protocol: http
+    description: "Streamlit web interface"
+
+# Resource allocation
+resources:
+  cpu: 2
+  memory: 4Gi
+  disk: 10Gi
+
+# VS Code extensions to install
+vscode_extensions:
+  - ms-python.python
+  - ms-python.vscode-pylance
+  - ms-toolsai.jupyter
+  - amazonwebservices.aws-toolkit-vscode
+
+# Working directory
+workdir: /workspace
+
+# Post-create commands
+post_create:
+  - name: welcome
+    command: |
+      echo "🏢 CRE Deal Voice Agent Development Environment"
+      echo "=============================================="
+      echo ""
+      echo "Quick Start:"
+      echo "  1. Configure your .env file with API keys"
+      echo "  2. Run: streamlit run app.py"
+      echo "  3. Open http://localhost:8501 in your browser"
+      echo ""
+      echo "Available commands:"
+      echo "  - coder start    : Start the application"
+      echo "  - coder install  : Install dependencies"
+      echo ""
+      echo "Documentation: See README.md for full details"
