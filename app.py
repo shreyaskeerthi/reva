@@ -30,7 +30,8 @@ from cre_agent.storage import (
     send_to_vanta,
     send_to_thoropass,
     run_daily_summary_job,
-    get_cluster_health
+    get_cluster_health,
+    upload_evidence_to_s3
 )
 from cre_agent.examples import get_all_examples
 
@@ -685,6 +686,23 @@ with tab_evidence:
                     st.subheader("Evidence Packet")
                     st.json(evidence)
 
+                    # Upload to S3 if configured
+                    s3_uri = None
+                    if st.session_state.settings.has_s3_config and st.session_state.settings.s3_bucket:
+                        with st.spinner("Uploading evidence to S3..."):
+                            s3_uri = upload_evidence_to_s3(
+                                evidence,
+                                st.session_state.settings.s3_bucket,
+                                st.session_state.settings.aws_region
+                            )
+                            if s3_uri:
+                                evidence["s3_uri"] = s3_uri
+                                st.success(f"✅ Uploaded to S3: {s3_uri}")
+                            else:
+                                st.warning("⚠️ Failed to upload to S3, but continuing with local storage")
+                    else:
+                        st.info("ℹ️ S3 not configured. Evidence will be stored locally only.")
+
                     vanta_ack = send_to_vanta(evidence)
                     st.success(f"✅ Sent to Vanta: {vanta_ack['evidence_id']}")
 
@@ -699,7 +717,11 @@ with tab_evidence:
                         st.subheader("Thoropass ACK")
                         st.json(thoropass_ack)
 
-                    st.info("Evidence logged to: ./runs/evidence_log.jsonl")
+                    # Show storage locations
+                    storage_locations = ["Evidence logged to: ./runs/evidence_log.jsonl"]
+                    if s3_uri:
+                        storage_locations.append(f"S3 URI: {s3_uri}")
+                    st.info(" | ".join(storage_locations))
 
                     st.divider()
                     st.markdown('<div class="navigation-hint">✅ Evidence packets sent! Click below to run daily summary job.</div>', unsafe_allow_html=True)
