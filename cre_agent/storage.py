@@ -148,6 +148,61 @@ def send_to_vanta(evidence: Dict) -> Dict:
     }
 
 
+def upload_evidence_to_s3(evidence: Dict, bucket: str, region: str = "us-east-1") -> Optional[str]:
+    """
+    Upload evidence packet to S3
+    
+    Args:
+        evidence: Evidence packet dictionary
+        bucket: S3 bucket name
+        region: AWS region
+    
+    Returns:
+        S3 URI if successful, None otherwise
+    """
+    if not bucket:
+        logger.warning("No S3 bucket configured, skipping S3 upload")
+        return None
+    
+    try:
+        import boto3
+        
+        s3_client = boto3.client("s3", region_name=region)
+        
+        run_id = evidence.get("run_id", "unknown")
+        timestamp = evidence.get("timestamp", datetime.now().isoformat())
+        
+        # Create key with organized structure
+        # Format: evidence/YYYY/MM/DD/run_id_timestamp.json
+        date_parts = timestamp.split("T")[0].split("-")
+        if len(date_parts) == 3:
+            year, month, day = date_parts
+            key = f"evidence/{year}/{month}/{day}/{run_id}_{timestamp.replace(':', '-').replace('.', '-')}.json"
+        else:
+            key = f"evidence/{run_id}_{timestamp.replace(':', '-').replace('.', '-')}.json"
+        
+        # Upload to S3
+        s3_client.put_object(
+            Bucket=bucket,
+            Key=key,
+            Body=json.dumps(evidence, indent=2, default=str),
+            ContentType="application/json",
+            Metadata={
+                "run_id": run_id,
+                "evidence_type": evidence.get("evidence_type", "unknown"),
+                "timestamp": timestamp
+            }
+        )
+        
+        s3_uri = f"s3://{bucket}/{key}"
+        logger.info(f"Uploaded evidence to {s3_uri}")
+        return s3_uri
+        
+    except Exception as e:
+        logger.error(f"Failed to upload evidence to S3: {e}")
+        return None
+
+
 def send_to_thoropass(evidence: Dict) -> Dict:
     """
     Send evidence packet to Thoropass (simulated)
