@@ -283,7 +283,7 @@ if 'last_uploaded_file' not in st.session_state:
 
 # Main title - Dark mode only
 st.markdown('<h1 class="main-title">⚡ REVA</h1>', unsafe_allow_html=True)
-st.markdown('<p class="reva-subtitle">POWERED BY AWS BEDROCK • DEEPGRAM • MERGE</p>', unsafe_allow_html=True)
+st.markdown('<p class="reva-subtitle">POWERED BY AWS BEDROCK & S3 • DEEPGRAM • MERGE</p>', unsafe_allow_html=True)
 
 # Sidebar: Buy-box Settings
 st.sidebar.header("⚙️ Buy-Box Settings")
@@ -501,7 +501,7 @@ with tab_input:
 
     if st.session_state.deal_text:
         st.divider()
-        st.markdown('<div class="navigation-hint">✅ Deal text loaded! Click below to move to the next step.</div>', unsafe_allow_html=True)
+        st.markdown('<div class="navigation-hint"> Deal text loaded! Ready for analysis.</div>', unsafe_allow_html=True)
         # optional auto-nav:
         # if st.button("➡️ Next: Analyze Deal", type="primary", use_container_width=True, key="nav_to_analyze"):
         #     st.session_state.switch_to_tab = 1
@@ -581,10 +581,8 @@ with tab_analyze:
                 st.info("Copy the text above to your clipboard")
 
             st.divider()
-            st.markdown('<div class="navigation-hint">✅ Deal analyzed! Click below to create CRM records.</div>', unsafe_allow_html=True)
-            if st.button("Next: Create CRM Records", type="primary", use_container_width=True, key="nav_to_crm"):
-                st.session_state.switch_to_tab = 2
-                st.rerun()
+            st.markdown('<div class="navigation-hint"> Deal analyzed!  CRM records Viewable.</div>', unsafe_allow_html=True)
+
 
 # TAB: CRM
 with tab_crm:
@@ -617,7 +615,7 @@ with tab_crm:
             location = structured.get("location", {})
             deal_location = f"{location.get('city', '')}, {location.get('state', '')}" if isinstance(location, dict) else ""
 
-        if st.button("📞 Create CRM Records via Merge", type="primary", use_container_width=True):
+        if st.button(" Create CRM Records via Merge", type="primary", use_container_width=True):
             with st.spinner("Creating CRM records..."):
                 try:
                     merge_client = MergeClient(
@@ -651,7 +649,7 @@ with tab_crm:
                         "created_at": datetime.now().isoformat()
                     }
 
-                    st.success("✅ CRM records created successfully!")
+                    st.success(" CRM records created successfully!")
                     st.info(f"**Contact ID:** {contact_id}")
                     st.info(f"**Note ID:** {note_id}")
                     st.info(f"**Task ID:** {task_id}")
@@ -665,7 +663,7 @@ with tab_crm:
             st.json(st.session_state.last_run["crm_records"])
 
             st.divider()
-            st.markdown('<div class="navigation-hint">✅ CRM records created! Click below to generate evidence packets.</div>', unsafe_allow_html=True)
+            st.markdown('<div class="navigation-hint"> CRM records created! Click below to generate evidence packets.</div>', unsafe_allow_html=True)
             if st.button("Next: Generate Evidence", type="primary", use_container_width=True, key="nav_to_evidence"):
                 st.session_state.switch_to_tab = 3
                 st.rerun()
@@ -679,7 +677,7 @@ with tab_evidence:
     else:
         st.markdown("Generate compliance evidence packets for Vanta and Thoropass")
 
-        if st.button("📋 Generate & Send Evidence Packet", use_container_width=True):
+        if st.button(" Generate & Send Evidence Packet", use_container_width=True):
             with st.spinner("Generating evidence packet..."):
                 try:
                     evidence = build_evidence_packet(st.session_state.last_run)
@@ -766,7 +764,7 @@ with tab_security:
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("🏝️ Island Browser Trust")
+        st.subheader("Island Browser Trust")
         st.markdown("""
         Island provides zero-trust browser security with real-time telemetry.
         This shim simulates Island's trust signals.
@@ -781,17 +779,17 @@ with tab_security:
             "threat_level": "low"
         }
 
-        st.markdown('<div class="status-healthy">✅ Trust Signal Active</div>', unsafe_allow_html=True)
+        st.markdown('<div class="status-healthy">Trust Signal Active</div>', unsafe_allow_html=True)
         st.json(island_signal)
 
     with col2:
-        st.subheader("☁️ Spectro Cloud Cluster Health")
+        st.subheader("Spectro Cloud Cluster Health")
         st.markdown("""
         Spectro Cloud manages Kubernetes infrastructure.
         In production, this would query the actual cluster status.
         """)
 
-        if st.button("🔄 Check Cluster Health"):
+        if st.button("Check Cluster Health"):
             with st.spinner("Checking cluster..."):
                 health = get_cluster_health()
                 if health["status"] == "healthy":
